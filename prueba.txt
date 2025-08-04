@@ -1,0 +1,99 @@
+POLÍTICA DE PRIVACIDAD
+
+1. Responsable del Tratamiento
+
+Empresa: StatementAI S.A.C.
+
+Domicilio: Av. Ejemplo 123, Miraflores, Lima, Perú
+
+Correo de contacto: privacidad@statementai.com
+
+2. Información que Recogemos
+2.1 Datos de Registro
+
+Nombre completo
+
+Correo electrónico
+
+Contraseña (almacenada de forma cifrada)
+
+2.2 Datos Técnicos y de Uso
+
+Dirección IP
+
+Tipo de dispositivo y sistema operativo
+
+Páginas visitadas, fecha y hora de acceso
+
+Cookies y tecnologías similares
+
+2.3 Datos Opcionales
+
+Información de ubicación (si la autorizas)
+
+Datos que compartas en formularios de feedback, encuestas o chat de soporte
+
+3. Finalidades y Bases Legales
+
+Finalidad	Datos	Base Legal
+Prestación del Servicio	Registro, Técnicos	Ejecución de contrato
+Mejora y desarrollo de nuevas funcionalidades	Uso, Cookies	Interés legítimo
+Envío de comunicaciones comerciales y ofertas	Registro	Consentimiento del usuario
+Atención al cliente y soporte	Registro, Uso	Ejecución de contrato / Consent.
+
+4. Conservación de Datos
+
+Datos de registro y perfil: mientras mantengas tu cuenta activa y hasta 2 años tras su eliminación.
+
+Datos técnicos y de uso: hasta 1 año para fines de seguridad y análisis estadístico.
+
+Datos comerciales (marketing): hasta que retires tu consentimiento.
+
+5. Destinatarios y Transferencias Internacionales
+
+Compartimos datos con proveedores de hosting y análisis (p. ej., servidores en AWS – EE. UU. – con cláusulas contractuales tipo aprobadas).
+
+Podemos recurrir a otras herramientas de terceros (Google Analytics, redes sociales) cuyos términos y políticas se aplican de forma adicional.
+
+6. Uso de Cookies
+
+Cookies estrictamente necesarias: permiten el funcionamiento básico (inicio de sesión, seguridad).
+
+Cookies de rendimiento y análisis: recogen información anónima sobre el uso para mejorar la plataforma.
+
+Cookies de publicidad: utilizan datos de navegación para mostrar anuncios relevantes (puedes desactivarlas en la configuración de tu navegador).
+
+7. Derechos de los Usuarios
+Tienes derecho a:
+
+Acceder a tus datos personales.
+
+Rectificar información inexacta o incompleta.
+
+Suprimir datos cuando ya no sean necesarios.
+
+Oponerte al tratamiento por motivos legítimos.
+
+Portar tus datos en formato estructurado (JSON, CSV).
+
+Limitar el tratamiento en casos concretos.
+
+Para ejercerlos, envía tu solicitud a privacidad@statementai.com con título “Protección de Datos” e indica qué derecho quieres ejercer. Responderemos en un plazo máximo de 30 días.
+
+8. Seguridad de la Información
+Implementamos medidas técnicas y organizativas adecuadas (cifrado SSL/TLS, control de accesos, copias de respaldo) para proteger tus datos frente a accesos no autorizados, alteración o pérdida.
+
+9. Menores de Edad
+Nuestros servicios están dirigidos a mayores de 16 años. Si eres menor, no envíes datos personales sin consentimiento de tus padres o tutores. Nos reservamos el derecho a cancelar cuentas de menores de edad detectadas.
+
+10. Cambios en la Política
+Podemos actualizar esta Política para adaptarla a cambios normativos o técnicos. Publicaremos la versión actualizada con la fecha de “Última revisión” en la parte superior, y, si los cambios son relevantes, te lo notificaremos por correo con al menos 15 días de antelación.
+
+11. Contacto
+Para cualquier duda, reclamación o sugerencia:
+
+Correo: privacidad@statementai.com
+
+Dirección: Av. Ejemplo 123, Miraflores, Lima, Perú
+
+Última revisión: 4 de agosto de 2025
