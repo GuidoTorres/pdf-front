@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Transaction Display Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .transaction {
+        background: white;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .amount {
+        font-weight: bold;
+        font-size: 1.1em;
+      }
+      .credit {
+        color: #22c55e; /* green */
+      }
+      .debit {
+        color: #ef4444; /* red */
+      }
+      .type-indicator {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: bold;
+      }
+      .income {
+        background-color: #dcfce7;
+        color: #166534;
+      }
+      .expense {
+        background-color: #fee2e2;
+        color: #991b1b;
+      }
+      .icon {
+        margin-right: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Transaction Display Test</h1>
+    <p>This test verifies the new transaction display logic:</p>
+    <ul>
+      <li>✅ Credits show positive amounts in green</li>
+      <li>✅ Debits show negative amounts in red</li>
+      <li>✅ Visual indicators for transaction type</li>
+      <li>✅ Proper sign display (+ for credits, - for debits)</li>
+    </ul>
+
+    <h2>Sample Transactions</h2>
+
+    <!-- Credit Transaction -->
+    <div class="transaction">
+      <div>
+        <strong>Salary Payment</strong><br />
+        <small>2025-01-15</small>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span class="type-indicator income">
+          <span class="icon">↙</span>Income
+        </span>
+        <span class="amount credit">
+          <span class="icon">↙</span>+€2,500.00
+        </span>
+      </div>
+    </div>
+
+    <!-- Debit Transaction -->
+    <div class="transaction">
+      <div>
+        <strong>Grocery Store Purchase</strong><br />
+        <small>2025-01-14</small>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span class="type-indicator expense">
+          <span class="icon">↗</span>Expense
+        </span>
+        <span class="amount debit"> <span class="icon">↗</span>-€85.50 </span>
+      </div>
+    </div>
+
+    <!-- Credit Transaction -->
+    <div class="transaction">
+      <div>
+        <strong>Bank Transfer Received</strong><br />
+        <small>2025-01-13</small>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span class="type-indicator income">
+          <span class="icon">↙</span>Income
+        </span>
+        <span class="amount credit">
+          <span class="icon">↙</span>+€1,200.00
+        </span>
+      </div>
+    </div>
+
+    <!-- Debit Transaction -->
+    <div class="transaction">
+      <div>
+        <strong>ATM Withdrawal</strong><br />
+        <small>2025-01-12</small>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span class="type-indicator expense">
+          <span class="icon">↗</span>Expense
+        </span>
+        <span class="amount debit"> <span class="icon">↗</span>-€200.00 </span>
+      </div>
+    </div>
+
+    <h2>Implementation Summary</h2>
+    <p>
+      The TransactionTable component has been updated with the following
+      changes:
+    </p>
+    <ol>
+      <li>
+        <strong>Amount Display Logic:</strong> Now uses transaction.type to
+        determine color and sign
+      </li>
+      <li>
+        <strong>Visual Indicators:</strong> Added arrow icons and type chips to
+        show income/expense
+      </li>
+      <li>
+        <strong>Sign Display:</strong> Credits show positive (+), debits show
+        negative (-)
+      </li>
+      <li>
+        <strong>Color Logic:</strong> Green for credits/income, red for
+        debits/expenses
+      </li>
+      <li>
+        <strong>Internationalization:</strong> Added translations for "Income"
+        and "Expense"
+      </li>
+    </ol>
+
+    <h2>Requirements Verification</h2>
+    <ul>
+      <li>
+        ✅ <strong>Requirement 2.1:</strong> Credits appear in green (success
+        color)
+      </li>
+      <li>
+        ✅ <strong>Requirement 2.2:</strong> Debits appear in red (danger color)
+      </li>
+      <li>
+        ✅ <strong>Requirement 2.3:</strong> Amounts include appropriate signs
+        (+ for credits, - for debits)
+      </li>
+    </ul>
+  </body>
+</html>

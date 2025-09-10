@@ -26,19 +26,19 @@ const SignUpPage: React.FC = () => {
 
     // Validaciones
     if (password !== confirmPassword) {
-      setError(t('passwordsDoNotMatch'));
+      setError(t('signUpPage.passwordsMismatch'));
       setIsLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setError(t('passwordTooShort'));
+      setError(t('signUpPage.passwordTooShort'));
       setIsLoading(false);
       return;
     }
 
     if (!agreeToTerms) {
-      setError(t('mustAcceptTerms'));
+      setError(t('signUpPage.mustAcceptTerms'));
       setIsLoading(false);
       return;
     }
@@ -48,10 +48,10 @@ const SignUpPage: React.FC = () => {
       if (success) {
         navigate('/');
       } else {
-        setError(t('errorCreatingAccount'));
+        setError(t('signUpPage.errorCreatingAccount'));
       }
     } catch (err: any) {
-      setError(err.message || t('errorCreatingAccount'));
+      setError(err.message || t('signUpPage.errorCreatingAccount'));
     } finally {
       setIsLoading(false);
     }
@@ -64,34 +64,34 @@ const SignUpPage: React.FC = () => {
     try {
       const success = await loginWithGoogle();
       if (!success) {
-        setError(t('errorSigningUpWithGoogle'));
+        setError(t('signUpPage.googleSignUpError'));
       }
       // No necesitamos navegar aquí, el listener se encargará
     } catch (err: any) {
-      setError(err.message || t('errorSigningUpWithGoogle'));
+      setError(err.message || t('signUpPage.googleSignUpError'));
     } finally {
       setIsGoogleLoading(false);
     }
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-background to-background/80">
-      <Card className="w-full max-w-md bg-content1/60 backdrop-blur-md border border-divider shadow-lg">
+    <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-background to-background/80 px-4 overflow-x-hidden">
+      <Card className="w-full max-w-md bg-content1/60 backdrop-blur-md border border-divider shadow-lg overflow-hidden">
         <CardHeader className="flex flex-col gap-1 text-center pb-6">
           <Icon icon="lucide:bar-chart-2" className="text-primary text-4xl mx-auto mb-2" />
-          <h1 className="text-2xl font-bold">{t('createAccount')}</h1>
-          <p className="text-sm text-foreground/80">{t('signUpToGetStarted')}</p>
+          <h1 className="text-2xl font-bold">{t('signUpPage.createAccount')}</h1>
+          <p className="text-sm text-foreground/80">{t('signUpPage.getStarted')}</p>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardBody className="flex flex-col gap-4">
+          <CardBody className="flex flex-col gap-4 overflow-x-hidden px-6">
             {error && (
               <div className="bg-danger/10 border border-danger/20 rounded-lg p-3">
                 <p className="text-danger text-sm">{error}</p>
               </div>
             )}
             <Input
-              label={t('fullName')}
-              placeholder={t('enterFullName')}
+              label={t('signUpPage.name')}
+              placeholder={t('signUpPage.enterName')}
               variant="bordered"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -99,8 +99,8 @@ const SignUpPage: React.FC = () => {
               isRequired
             />
             <Input
-              label={t('email')}
-              placeholder={t('enterEmail')}
+              label={t('signUpPage.email')}
+              placeholder={t('signUpPage.enterEmail')}
               type="email"
               variant="bordered"
               value={email}
@@ -109,8 +109,8 @@ const SignUpPage: React.FC = () => {
               isRequired
             />
             <Input
-              label={t('password')}
-              placeholder={t('createPassword')}
+              label={t('signUpPage.password')}
+              placeholder={t('signUpPage.createPassword')}
               type="password"
               variant="bordered"
               value={password}
@@ -119,8 +119,8 @@ const SignUpPage: React.FC = () => {
               isRequired
             />
             <Input
-              label={t('confirmPassword')}
-              placeholder={t('confirmPassword')}
+              label={t('signUpPage.confirmPassword')}
+              placeholder={t('signUpPage.confirmPassword')}
               type="password"
               variant="bordered"
               value={confirmPassword}
@@ -131,9 +131,18 @@ const SignUpPage: React.FC = () => {
             <Checkbox 
               isSelected={agreeToTerms}
               onValueChange={setAgreeToTerms}
+              className="items-start"
             >
-              {t('agreeToTerms')} <Link to="/terms" className="text-primary">{t('termsOfService')}</Link> {t('and')}{' '}
-              <Link to="/privacy" className="text-primary">{t('privacyPolicy')}</Link>
+              <div className="text-sm text-wrap break-words leading-relaxed">
+                {t('signUpPage.agreeTo')}{' '}
+                <Link to="/terms" className="text-primary hover:underline">
+                  {t('signUpPage.terms')}
+                </Link>{' '}
+                {t('signUpPage.and')}{' '}
+                <Link to="/privacy" className="text-primary hover:underline">
+                  {t('signUpPage.privacy')}
+                </Link>
+              </div>
             </Checkbox>
             <Button 
               color="primary" 
@@ -143,14 +152,14 @@ const SignUpPage: React.FC = () => {
               isLoading={isLoading}
               isDisabled={!name || !email || !password || !confirmPassword || !agreeToTerms}
             >
-              {isLoading ? t('creatingAccount') : t('signUp')}
+              {isLoading ? t('signUpPage.creatingAccount') : t('signUpPage.signUp')}
             </Button>
             <div className="relative my-2">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-divider"></span>
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-content1 px-2 text-foreground/50">{t('orContinueWith')}</span>
+                <span className="bg-content1 px-2 text-foreground/50">{t('signUpPage.orContinueWith')}</span>
               </div>
             </div>
             <Button 
@@ -161,13 +170,16 @@ const SignUpPage: React.FC = () => {
               isLoading={isGoogleLoading}
               isDisabled={isLoading}
             >
-              {isGoogleLoading ? t('signingIn') : t('signInWithGoogle')}
+              {isGoogleLoading ? t('signUpPage.signingUp') : t('signUpPage.signUpWithGoogle')}
             </Button>
           </CardBody>
         </form>
         <CardFooter className="justify-center pt-0">
-          <p className="text-sm text-foreground/80">
-            {t('alreadyHaveAccount')} <Link to="/login" className="text-primary font-medium hover:underline">{t('login')}</Link>
+          <p className="text-sm text-foreground/80 text-center text-wrap break-words">
+            {t('signUpPage.haveAccount')}{' '}
+            <Link to="/login" className="text-primary font-medium hover:underline">
+              {t('signUpPage.login')}
+            </Link>
           </p>
         </CardFooter>
       </Card>

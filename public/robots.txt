@@ -1,0 +1,36 @@
+User-agent: *
+Allow: /
+
+# Sitemap - StatementAI
+Sitemap: https://tu-dominio.com/sitemap.xml
+
+# Principales páginas para crawlear - StatementAI
+Allow: /
+Allow: /help
+Allow: /pricing
+Allow: /terms
+Allow: /privacy
+
+# Bloquear páginas privadas
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /settings
+Disallow: /history
+
+# Crawl-delay para ser amigable con los bots
+Crawl-delay: 1
+
+# Google específico - StatementAI
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+# Bingbot específico - StatementAI
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+# Keywords importantes para bots
+# PDF to Excel AI - Conversor con IA
+# Inteligencia artificial PDF
+# Automated data extraction

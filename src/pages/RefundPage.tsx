@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardHeader, CardBody } from "@heroui/react";
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@iconify/react';
+import LegalPageNavigation from '../components/LegalPageNavigation';
 
 const RefundPage: React.FC = () => {
   const { t } = useTranslation();
@@ -14,6 +15,7 @@ const RefundPage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+      <LegalPageNavigation />
       <Card className="bg-content1/60 backdrop-blur-md border border-divider shadow-lg">
         <CardHeader className="border-b border-divider p-6">
           <div className="flex items-center">

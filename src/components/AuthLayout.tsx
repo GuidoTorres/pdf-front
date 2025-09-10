@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { ThemeToggle } from './theme-toggle';
+import LanguageToggle from './LanguageToggle';
 
 const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
@@ -13,7 +14,10 @@ const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <Icon icon="lucide:bar-chart-2" className="text-primary text-2xl mr-2" />
             <span className="font-bold text-xl">StatementAI</span>
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-x-4">
+            <LanguageToggle />
+            <ThemeToggle />
+          </div>
         </div>
       </div>
 

@@ -41,35 +41,35 @@ const HelpPage: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-content1/60 backdrop-blur-md border border-divider">
-        <CardHeader>
-          <h2 className="text-2xl font-semibold">{t('helpPage.title')}</h2>
-        </CardHeader>
-        <CardBody>
-          <Accordion>
-            {faqItems.map((item, index) => (
-              <AccordionItem key={index} aria-label={item.question} title={item.question}>
-                {item.answer}
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </CardBody>
-      </Card>
+    <div className="space-y-6 max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+        <Card className="bg-content1/60 backdrop-blur-md border border-divider">
+          <CardHeader>
+            <h2 className="text-2xl font-semibold">{t('helpPage.title')}</h2>
+          </CardHeader>
+          <CardBody>
+            <Accordion>
+              {faqItems.map((item, index) => (
+                <AccordionItem key={index} aria-label={item.question} title={item.question}>
+                  {item.answer}
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </CardBody>
+        </Card>
 
-      <Card className="bg-content1/60 backdrop-blur-md border border-divider">
-        <CardHeader>
-          <h2 className="text-2xl font-semibold">{t('helpPage.contact')}</h2>
-        </CardHeader>
-        <CardBody className="text-center">
-          <p className="mb-4">If you need further assistance, please don't hesitate to contact us.</p>
-          <Button as="a" href="mailto:support@statementai.com" color="primary">
-            <Icon icon="lucide:mail" className="mr-2" />
-            support@statementai.com
-          </Button>
-        </CardBody>
-      </Card>
-    </div>
+        <Card className="bg-content1/60 backdrop-blur-md border border-divider">
+          <CardHeader>
+            <h2 className="text-2xl font-semibold">{t('helpPage.contact')}</h2>
+          </CardHeader>
+          <CardBody className="text-center">
+            <p className="mb-4">If you need further assistance, please don't hesitate to contact us.</p>
+            <Button as="a" href="mailto:support@statementai.com" color="primary">
+              <Icon icon="lucide:mail" className="mr-2" />
+              support@statementai.com
+            </Button>
+          </CardBody>
+        </Card>
+      </div>
   );
 };
 

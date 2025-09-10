@@ -1,10 +1,19 @@
-import React, { useEffect } from 'react';
+import React, { useEffect } from "react";
 import { HeroUIProvider } from "@heroui/react";
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, Outlet } from "react-router-dom";
-import { ThemeProvider } from './components/theme-provider';
-import Layout from './components/Layout';
-import AuthLayout from './components/AuthLayout';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  Outlet,
+  useLocation,
+} from "react-router-dom";
+import { ThemeProvider } from "./components/theme-provider";
+import Layout from "./components/Layout";
+import AuthLayout from "./components/AuthLayout";
 import DashboardPage from "./pages/DashboardPage";
+import AdminPage from "./pages/AdminPage";
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage";
 import HistoryPage from "./pages/HistoryPage";
@@ -14,17 +23,44 @@ import PricingPage from "./pages/PricingPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import RefundPage from "./pages/RefundPage";
-import { useAuthStore } from './stores/useAuthStore';
+import LandingPage from "./pages/LandingPage";
+import NotFoundPage from "./pages/NotFoundPage";
+import LandingLayout from "./components/LandingLayout";
+import ConditionalLayout from "./components/ConditionalLayout";
+import NotificationProvider from "./components/NotificationProvider";
+import { useAuthStore } from "./stores/useAuthStore";
+import { useWebSocketStore } from "./stores/useWebSocketStore";
 
 const AppInitializer: React.FC = () => {
   const navigate = useNavigate();
-  const { initialize, isLoading } = useAuthStore();
+  const { initialize, isLoading, isAuthenticated } =
+    useAuthStore();
+  const { connect: connectWebSocket, disconnect: disconnectWebSocket } =
+    useWebSocketStore();
 
   useEffect(() => {
-    console.log('[DEBUG] Current window location on load:', window.location.href);
     const unsubscribe = initialize(navigate);
     return () => unsubscribe();
   }, [initialize, navigate]);
+
+  // Initialize WebSocket when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      // Wait a bit to ensure token is properly saved after Google login
+      const connectTimeout = setTimeout(() => {
+        const token = localStorage.getItem("auth_token");
+        if (token && token.trim() && token !== "null" && token !== "undefined") {
+          connectWebSocket(token);
+        } else {
+          disconnectWebSocket();
+        }
+      }, 200);
+
+      return () => clearTimeout(connectTimeout);
+    } else {
+      disconnectWebSocket();
+    }
+  }, [isAuthenticated, isLoading, connectWebSocket, disconnectWebSocket]);
 
   if (isLoading) {
     return (
@@ -37,31 +73,68 @@ const AppInitializer: React.FC = () => {
   return null;
 };
 
+import ScrollToTop from "./components/ScrollToTop";
+
 function App() {
   return (
     <HeroUIProvider>
       <ThemeProvider>
         <Router>
+          <ScrollToTop />
           <AppInitializer />
           <Routes>
-            <Route path="/" element={<ProtectedRoute><LayoutWithOutlet /></ProtectedRoute>}>
-              <Route index element={<DashboardPage />} />
-              <Route path="history" element={<HistoryPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="help" element={<HelpPage />} />
-              <Route path="pricing" element={<PricingPage />} />
-              <Route path="terms" element={<TermsPage />} />
-              <Route path="privacy" element={<PrivacyPage />} />
-              <Route path="refund" element={<RefundPage />} />
+            {/* Public Routes with LandingLayout */}
+            <Route
+              element={
+                <LandingLayout>
+                  <Outlet />
+                </LandingLayout>
+              }
+            >
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/help" element={<HelpPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
             </Route>
 
-            <Route path="/" element={<PublicRoute><AuthLayoutWithOutlet /></PublicRoute>}>
-              <Route path="login" element={<LoginPage />} />
-              <Route path="signup" element={<SignUpPage />} />
+            {/* Legal Routes with ConditionalLayout (accessible to both authenticated and non-authenticated users) */}
+            <Route element={<ConditionalLayout />}>
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/refund" element={<RefundPage />} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Auth Routes with AuthLayout */}
+            <Route
+              element={
+                <PublicRoute>
+                  <AuthLayoutWithOutlet />
+                </PublicRoute>
+              }
+            >
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignUpPage />} />
+            </Route>
+
+            {/* Protected Routes with Main Layout */}
+            <Route
+              element={
+                <ProtectedRoute>
+                  <LayoutWithOutlet />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Route>
+
+            {/* 404 Page for unmatched routes */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
+
+          {/* Global Notification System */}
+          <NotificationProvider />
         </Router>
       </ThemeProvider>
     </HeroUIProvider>
@@ -80,7 +153,9 @@ const AuthLayoutWithOutlet: React.FC = () => (
   </AuthLayout>
 );
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { isAuthenticated, isLoading } = useAuthStore();
 
   if (isLoading) {
@@ -110,7 +185,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;

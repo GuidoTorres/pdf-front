@@ -1,22 +1,52 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { apiService, User } from '../services/api';
-import { supabase, signInWithGoogle as supabaseSignInWithGoogle } from '../services/supabase';
-import { NavigateFunction } from 'react-router-dom';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import {
+  signInWithPassword,
+  signUpWithPassword,
+  signOut,
+} from "../services/auth";
+import { apiService, setAuthExpiredHandler } from "../services/api";
+import { NavigateFunction } from "react-router-dom";
+import { useNotificationStore } from "./useNotificationStore";
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  plan?: string;
+  pages_remaining?: number;
+  subscription?: {
+    plan: string;
+    pages_remaining: number;
+    expires_at?: string;
+    renewed_at?: string;
+    next_reset?: string;
+    total_pages_used?: number;
+    pages_used_this_month?: number;
+  };
+}
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isRehydrated: boolean; // Add this
   navigate: NavigateFunction | null;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, name?: string) => Promise<boolean>;
+  register: (
+    email: string,
+    password: string,
+    name?: string
+  ) => Promise<boolean>;
   loginWithGoogle: () => Promise<boolean>;
   logout: () => void;
   checkAuth: () => Promise<void>;
   initialize: (navigate?: NavigateFunction) => () => void;
   setNavigate: (navigate: NavigateFunction) => void;
-  handleSupabaseSession: (session: any) => Promise<void>;
+  handleAuthExpired: () => void;
+  handleGoogleLoginSuccess: (data: { user: User; token: string }) => void;
+  updateUserPages: (pagesDeducted: number, remainingPages?: number) => void;
+  refreshUserData: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -25,118 +55,93 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       isLoading: true,
+      isRehydrated: false, // Add this
       navigate: null,
 
       setNavigate: (navigate) => set({ navigate }),
 
       initialize: (navigate) => {
+        const currentState = get();
+        
+
         if (navigate) {
           get().setNavigate(navigate);
         }
-        
+
+        // Configure API service auth expired handler
+        setAuthExpiredHandler(() => {
+          get().handleAuthExpired();
+        });
+
         const checkInitialSession = async () => {
           try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-              await get().handleSupabaseSession(session);
-            } else {
+            // Wait for rehydration to complete
+            const waitForRehydration = () => {
+              return new Promise<void>((resolve) => {
+                const checkRehydration = () => {
+                  const currentState = get();
+                  if (currentState.isRehydrated) {
+                    resolve();
+                  } else {
+                    setTimeout(checkRehydration, 50);
+                  }
+                };
+                checkRehydration();
+              });
+            };
+
+            await waitForRehydration();
+            
+            // Check both localStorage and persisted state
+            const token = localStorage.getItem("auth_token");
+            const currentState = get();
+            
+            
+            // If we have persisted authentication but no token, something is wrong
+            // However, give a brief moment for Google login to complete token storage
+            if (currentState.isAuthenticated && currentState.user && !token) {
+              console.warn("[AUTH] Persisted auth but no token - waiting briefly for token...");
+              
+              // Wait briefly for token to be saved (Google login may be in progress)
+              await new Promise(resolve => setTimeout(resolve, 100));
+              const retryToken = localStorage.getItem("auth_token");
+              
+              if (!retryToken || retryToken.trim() === "" || retryToken === "null" || retryToken === "undefined") {
+                console.warn("[AUTH] Still no token after retry - clearing persisted state");
+                set({ isLoading: false, isAuthenticated: false, user: null });
+                return;
+              } else {
+                await get().checkAuth();
+                return;
+              }
+            }
+            
+            // Only check auth if we have a token that looks valid
+            if (token && token.trim() && token !== "null" && token !== "undefined") {
               await get().checkAuth();
+            } else {
+              set({ isLoading: false, isAuthenticated: false, user: null });
             }
           } catch (error) {
-            console.error('Error checking initial session:', error);
-            set({ isLoading: false });
+            console.error("Error checking initial session:", error);
+            set({ isLoading: false, isAuthenticated: false, user: null });
           }
         };
 
         checkInitialSession();
 
-        const { data: authListener } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
-            console.log('Auth state changed:', event, session);
-            
-            if (event === 'SIGNED_IN' && session) {
-              await get().handleSupabaseSession(session);
-            } else if (event === 'SIGNED_OUT') {
-              localStorage.removeItem('auth_token');
-              set({
-                user: null,
-                isAuthenticated: false,
-                isLoading: false,
-              });
-            } else if (event === 'TOKEN_REFRESHED' && session) {
-              await get().handleSupabaseSession(session);
-            }
-          }
-        );
-
         return () => {
-          authListener.subscription.unsubscribe();
+          // No cleanup needed for JWT-based auth
         };
-      },
-
-      handleSupabaseSession: async (session: any) => {
-        console.log('[AuthStore] Handling Supabase session. Calling backend...');
-        try {
-          const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/google-callback`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              supabaseToken: session.access_token,
-              user: session.user,
-            }),
-          });
-
-          console.log(`[AuthStore] Backend response status: ${response.status}`);
-
-          if (response.ok) {
-            const data = await response.json();
-            console.log('[AuthStore] Backend response data:', data);
-
-            if (data.success && data.token) {
-              console.log('[AuthStore] Backend login successful. Setting token and user state.');
-              localStorage.setItem('auth_token', data.token);
-              set({
-                user: data.user,
-                isAuthenticated: true,
-                isLoading: false,
-              });
-              
-              const { navigate } = get();
-              if (navigate) {
-                const currentPath = window.location.pathname;
-                if (currentPath === '/login' || currentPath === '/signup') {
-                  console.log('[AuthStore] Navigate function found. Redirecting to /');
-                  navigate('/');
-                } else {
-                  console.log('[AuthStore] User already on a protected route. No redirect needed.');
-                }
-              } else {
-                console.error('[AuthStore] Navigate function not found!');
-              }
-            } else {
-              console.error('[AuthStore] Backend returned an error:', data);
-              set({ isLoading: false });
-            }
-          } else {
-            const errorText = await response.text();
-            console.error('[AuthStore] Backend call failed:', errorText);
-            set({ isLoading: false });
-          }
-        } catch (error) {
-          console.error('[AuthStore] Critical error in handleSupabaseSession:', error);
-          set({ isLoading: false });
-        }
       },
 
       login: async (email: string, password: string) => {
         set({ isLoading: true });
         try {
-          const response = await apiService.login(email, password);
-          if (response.success && response.data) {
+          const data = await signInWithPassword(email, password);
+          if (data.success && data.user) {
             set({
-              user: response.data.user,
+              user: data.user,
               isAuthenticated: true,
               isLoading: false,
             });
@@ -145,18 +150,19 @@ export const useAuthStore = create<AuthState>()(
           set({ isLoading: false });
           return false;
         } catch (error) {
+          console.error("Login error:", error);
           set({ isLoading: false });
-          return false;
+          throw error;
         }
       },
 
       register: async (email: string, password: string, name?: string) => {
         set({ isLoading: true });
         try {
-          const response = await apiService.register(email, password, name);
-          if (response.success && response.data) {
+          const data = await signUpWithPassword(email, password, name);
+          if (data.success && data.user) {
             set({
-              user: response.data.user,
+              user: data.user,
               isAuthenticated: true,
               isLoading: false,
             });
@@ -165,38 +171,46 @@ export const useAuthStore = create<AuthState>()(
           set({ isLoading: false });
           return false;
         } catch (error) {
+          console.error("Register error:", error);
           set({ isLoading: false });
-          return false;
+          throw error;
         }
       },
 
       loginWithGoogle: async () => {
         set({ isLoading: true });
         try {
-          await supabaseSignInWithGoogle();
+          // Google auth is handled by the GoogleSignInButton component
+          // This method is kept for compatibility
           return true;
         } catch (error) {
+          console.error("Google login error:", error);
           set({ isLoading: false });
           return false;
         }
       },
 
-      logout: () => {
-        supabase.auth.signOut();
-        apiService.logout();
-        set({
-          user: null,
-          isAuthenticated: false,
-        });
-        const { navigate } = get();
-        if (navigate) {
-          navigate('/login');
+      logout: async () => {
+        try {
+          await signOut();
+        } catch (error) {
+          console.error("Logout error:", error);
+        } finally {
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+          const { navigate } = get();
+          if (navigate) {
+            navigate("/login");
+          }
         }
       },
 
       checkAuth: async () => {
-        const token = localStorage.getItem('auth_token');
-        if (!token) {
+        const token = localStorage.getItem("auth_token");
+        if (!token || token.trim() === "" || token === "null" || token === "undefined") {
           set({ isAuthenticated: false, user: null, isLoading: false });
           return;
         }
@@ -204,6 +218,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const response = await apiService.getCurrentUser();
+          
           if (response.success && response.data) {
             set({
               user: response.data,
@@ -211,7 +226,8 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
             });
           } else {
-            localStorage.removeItem('auth_token');
+            localStorage.removeItem("auth_token");
+            localStorage.removeItem("user");
             set({
               user: null,
               isAuthenticated: false,
@@ -219,7 +235,8 @@ export const useAuthStore = create<AuthState>()(
             });
           }
         } catch (error) {
-          localStorage.removeItem('auth_token');
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("user");
           set({
             user: null,
             isAuthenticated: false,
@@ -227,13 +244,90 @@ export const useAuthStore = create<AuthState>()(
           });
         }
       },
+
+      handleAuthExpired: () => {
+        // Show notification
+        useNotificationStore
+          .getState()
+          .warning(
+            "Session Expired",
+            "Your session has expired. Please log in again."
+          );
+
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("user");
+        
+        set({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+        
+        const { navigate } = get();
+        if (navigate) {
+          navigate("/login");
+        }
+      },
+
+      handleGoogleLoginSuccess: (data) => {
+        set({
+          user: data.user,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        localStorage.setItem("auth_token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+      },
+
+      // Add method to update user pages in real-time
+      updateUserPages: (pagesDeducted: number, remainingPages?: number) => {
+        const currentUser = get().user;
+        if (!currentUser) return;
+
+        const updatedUser = {
+          ...currentUser,
+          pages_remaining:
+            remainingPages ??
+            (currentUser.pages_remaining || 0) - pagesDeducted,
+          subscription: currentUser.subscription
+            ? {
+                ...currentUser.subscription,
+                pages_remaining:
+                  remainingPages ??
+                  (currentUser.subscription.pages_remaining || 0) -
+                    pagesDeducted,
+              }
+            : undefined,
+        };
+
+        set({ user: updatedUser });
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+      },
+
+      // Add method to refresh user data
+      refreshUserData: async () => {
+        try {
+          const response = await apiService.getCurrentUser();
+          if (response.success && response.data) {
+            set({ user: response.data });
+            localStorage.setItem("user", JSON.stringify(response.data));
+          }
+        } catch (error) {
+          console.error("Error refreshing user data:", error);
+        }
+      },
     }),
     {
-      name: 'auth-storage',
+      name: "auth-storage",
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.isRehydrated = true;
+        }
+      },
     }
   )
 );
