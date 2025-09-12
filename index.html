@@ -35,52 +35,62 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     
-    <!-- Google Analytics 4 -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
+    <!-- Analytics Scripts - Only load if IDs are configured -->
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'GA_MEASUREMENT_ID', {
-        page_title: 'AI PDF to Excel Converter',
-        page_location: window.location.href,
-        content_group1: 'Landing Page'
-      });
-      
-      // Enhanced measurement events
-      gtag('config', 'GA_MEASUREMENT_ID', {
-        enhanced_measurement_scrolls: true,
-        enhanced_measurement_outbound_clicks: true,
-        enhanced_measurement_site_search: true,
-        enhanced_measurement_video_engagement: true,
-        enhanced_measurement_file_downloads: true
-      });
-    </script>
+      // Google Analytics 4 - Only if ID is configured
+      const GA_ID = 'GA_MEASUREMENT_ID'; // Replace with your actual ID
+      if (GA_ID && GA_ID !== 'GA_MEASUREMENT_ID' && GA_ID.startsWith('G-')) {
+        const gaScript = document.createElement('script');
+        gaScript.async = true;
+        gaScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
+        document.head.appendChild(gaScript);
+        
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', GA_ID, {
+          page_title: 'AI PDF to Excel Converter',
+          page_location: window.location.href,
+          content_group1: 'Landing Page'
+        });
+        
+        // Enhanced measurement events
+        gtag('config', GA_ID, {
+          enhanced_measurement_scrolls: true,
+          enhanced_measurement_outbound_clicks: true,
+          enhanced_measurement_site_search: true,
+          enhanced_measurement_video_engagement: true,
+          enhanced_measurement_file_downloads: true
+        });
+      }
 
-    <!-- Meta Pixel (Facebook/Instagram Ads) -->
-    <script>
-      !function(f,b,e,v,n,t,s)
-      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window, document,'script',
-      'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', 'YOUR_PIXEL_ID');
-      fbq('track', 'PageView');
-    </script>
+      // Meta Pixel - Only if ID is configured
+      const FB_PIXEL_ID = 'YOUR_PIXEL_ID'; // Replace with your actual ID
+      if (FB_PIXEL_ID && FB_PIXEL_ID !== 'YOUR_PIXEL_ID' && FB_PIXEL_ID.length > 5) {
+        !function(f,b,e,v,n,t,s)
+        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', FB_PIXEL_ID);
+        fbq('track', 'PageView');
+      }
 
-    <!-- Hotjar - User Behavior Analytics -->
-    <script>
-      (function(h,o,t,j,a,r){
-        h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
-        h._hjSettings={hjid:YOUR_HOTJAR_ID,hjsv:6};
-        a=o.getElementsByTagName('head')[0];
-        r=o.createElement('script');r.async=1;
-        r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
-        a.appendChild(r);
-      })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+      // Hotjar - Only if ID is configured
+      const HOTJAR_ID = 'YOUR_HOTJAR_ID'; // Replace with your actual ID
+      if (HOTJAR_ID && HOTJAR_ID !== 'YOUR_HOTJAR_ID' && !isNaN(HOTJAR_ID)) {
+        (function(h,o,t,j,a,r){
+          h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+          h._hjSettings={hjid:HOTJAR_ID,hjsv:6};
+          a=o.getElementsByTagName('head')[0];
+          r=o.createElement('script');r.async=1;
+          r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
+          a.appendChild(r);
+        })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+      }
     </script>
 
     <!-- Structured Data -->

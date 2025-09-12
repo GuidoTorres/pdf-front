@@ -22,44 +22,62 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     (state) => state.handleGoogleLoginSuccess
   );
 
-  const login = useGoogleLogin({
-    onSuccess: async (codeResponse) => {
-      setIsLoading(true);
-      try {
-        const result = await fetch(
-          `${import.meta.env.VITE_API_URL}/auth/google-callback`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ code: codeResponse.code }),
+  // Check if Google OAuth is available
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const isGoogleAvailable = GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID !== 'your-google-client-id.apps.googleusercontent.com';
+
+  let login: (() => void) | null = null;
+
+  // Only initialize useGoogleLogin if Google is available
+  if (isGoogleAvailable) {
+    try {
+      login = useGoogleLogin({
+        onSuccess: async (codeResponse) => {
+          setIsLoading(true);
+          try {
+            const result = await fetch(
+              `${import.meta.env.VITE_API_URL}/auth/google-callback`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ code: codeResponse.code }),
+              }
+            );
+
+            if (!result.ok) {
+              const errorText = await result.text();
+              console.error('Backend error:', result.status, errorText);
+              throw new Error(`Backend error: ${result.status} - ${errorText}`);
+            }
+
+            const data = await result.json();
+
+            if (data.success) {
+              handleGoogleLoginSuccess(data);
+              onSuccess?.(data);
+            } else {
+              throw new Error(data.error || 'Google authentication failed');
+            }
+          } catch (error) {
+            console.error('Google auth error:', error);
+            onError?.(error);
+          } finally {
+            setIsLoading(false);
           }
-        );
+        },
+        flow: 'auth-code',
+      });
+    } catch (error) {
+      console.warn('Google OAuth not available:', error);
+    }
+  }
 
-        if (!result.ok) {
-          const errorText = await result.text();
-          console.error('Backend error:', result.status, errorText);
-          throw new Error(`Backend error: ${result.status} - ${errorText}`);
-        }
-
-        const data = await result.json();
-
-        if (data.success) {
-          handleGoogleLoginSuccess(data);
-          onSuccess?.(data);
-        } else {
-          throw new Error(data.error || 'Google authentication failed');
-        }
-      } catch (error) {
-        console.error('Google auth error:', error);
-        onError?.(error);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    flow: 'auth-code',
-  });
+  // Don't render if Google OAuth is not available
+  if (!isGoogleAvailable) {
+    return null;
+  }
 
   return (
     <Button
@@ -68,7 +86,7 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       fullWidth
       isLoading={isLoading}
       isDisabled={disabled}
-      onClick={() => login()}
+      onClick={() => login && login()}
       startContent={
         !isLoading && <Icon icon="logos:google-icon" className="text-lg" />
       }

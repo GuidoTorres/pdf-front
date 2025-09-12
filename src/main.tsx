@@ -10,17 +10,33 @@ import "./index.css";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
+// App component with conditional Google OAuth
+const AppWithProvider = () => {
+  const content = (
+    <I18nextProvider i18n={i18n}>
+      <HeroUIProvider>
+        <ToastProvider />
+        <main className="text-foreground bg-background">
+          <App />
+        </main>
+      </HeroUIProvider>
+    </I18nextProvider>
+  );
+
+  // Only wrap with GoogleOAuthProvider if client ID is available
+  if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID !== 'your-google-client-id.apps.googleusercontent.com') {
+    return (
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        {content}
+      </GoogleOAuthProvider>
+    );
+  }
+
+  return content;
+};
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <I18nextProvider i18n={i18n}>
-        <HeroUIProvider>
-          <ToastProvider />
-          <main className="text-foreground bg-background">
-            <App />
-          </main>
-        </HeroUIProvider>
-      </I18nextProvider>
-    </GoogleOAuthProvider>
+    <AppWithProvider />
   </React.StrictMode>,
 );

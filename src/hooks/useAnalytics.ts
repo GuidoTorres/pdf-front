@@ -3,9 +3,9 @@ import { useCallback } from 'react';
 // Declare gtag function for TypeScript
 declare global {
   interface Window {
-    gtag: (command: string, ...args: any[]) => void;
-    fbq: (command: string, ...args: any[]) => void;
-    hj: (command: string, ...args: any[]) => void;
+    gtag?: (command: string, ...args: any[]) => void;
+    fbq?: (command: string, ...args: any[]) => void;
+    hj?: (command: string, ...args: any[]) => void;
   }
 }
 
