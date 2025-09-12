@@ -151,7 +151,7 @@ export const useAnalytics = () => {
     });
   }, [trackEvent]);
 
-  const trackSubscriptionUpgrade = useCallback=(plan: string, value: number) => {
+  const trackSubscriptionUpgrade = useCallback((plan: string, value: number) => {
     trackEvent({
       action: 'subscription_upgrade',
       category: 'Revenue',
