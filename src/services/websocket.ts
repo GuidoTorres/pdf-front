@@ -31,31 +31,48 @@ export interface QueueStatus {
   activeWorkers: number;
 }
 
+type AdminQueueMetrics = Record<
+  string,
+  {
+    waiting: number;
+    active: number;
+    completed?: number;
+  }
+>;
+
 export interface WorkerMetrics {
   workerId: string;
-  status: "active" | "idle" | "overloaded" | "failed";
-  jobsInProgress: number;
-  jobsCompletedHour: number;
-  avgProcessingTime: number;
-  memoryUsage: number;
-  cpuUsage: number;
-  lastHeartbeat: Date;
+  status: "idle" | "processing" | "stalled" | "error" | "offline";
+  queueName?: string;
+  currentJob?: string | null;
+  jobsCompleted?: number;
+  jobsFailed?: number;
+  avgProcessingTime?: number;
+  lastProcessingTime?: number;
+  memoryUsage?: number;
+  cpuUsage?: number;
+  lastHeartbeat?: number;
+  lastUpdated?: number;
 }
 
 export interface SystemMetrics {
-  timestamp: Date;
+  timestamp: string;
   workers: WorkerMetrics[];
-  queues: QueueStatus;
-  system: {
-    totalMemoryUsage: number;
-    totalCpuUsage: number;
-    systemLoad: number;
-  };
+  queues: AdminQueueMetrics;
   performance: {
-    totalJobsProcessed: number;
+    totalJobsLastHour: number;
+    successfulJobs: number;
+    failedJobs: number;
+    successRate: number;
     averageProcessingTime: number;
-    errorRate: number;
-    throughputPerHour: number;
+    totalActiveJobs: number;
+    totalWaitingJobs: number;
+  };
+  system: {
+    connectedUsers: number;
+    connectedAdmins: number;
+    activeWorkers: number;
+    uptime: number;
   };
 }
 
@@ -92,10 +109,12 @@ class WebSocketService {
 
       this.socket.on("connect", () => {
         // Authenticate with the server ONLY if we have a token
-        const authToken = token || localStorage.getItem("auth_token");
-        if (authToken && authToken.trim() !== "" && authToken !== "null" && authToken !== "undefined") {
-          this.socket?.emit("authenticate", { token: authToken });
-        }
+        import('./api').then(({ getAuthToken }) => {
+          const authToken = token || getAuthToken();
+          if (authToken) {
+            this.socket?.emit("authenticate", { token: authToken });
+          }
+        });
         
         this.isConnecting = false;
         this.reconnectAttempts = 0;
@@ -201,28 +220,25 @@ class WebSocketService {
         console.error("WebSocket auth error:", error);
         
         // Check if user is actually authenticated in the auth store before triggering logout
-        import("../stores/useAuthStore").then(({ useAuthStore }) => {
-          const authState = useAuthStore.getState();
-          const authToken = token || localStorage.getItem("auth_token");
-          
-          // Only trigger logout if:
-          // 1. User is currently authenticated in the store
-          // 2. We had a valid token when connecting
-          // 3. Auth error is not due to missing/invalid token on connection
-          if (authState.isAuthenticated && authState.user && 
-              authToken && authToken.trim() !== "" && 
-              authToken !== "null" && authToken !== "undefined") {
+        Promise.all([
+          import('../stores/useAuthStore'),
+          import('./api')
+        ])
+          .then(([{ useAuthStore }, { getAuthToken }]) => {
+            const authState = useAuthStore.getState();
+            const authToken = token || getAuthToken();
+
+            if (authState.isAuthenticated && authState.user && authToken) {
+              this.disconnect();
+              authState.handleAuthExpired();
+            } else {
+              this.disconnect();
+            }
+          })
+          .catch((err) => {
+            console.error("Error handling auth expiry:", err);
             this.disconnect();
-            authState.handleAuthExpired();
-          } else {
-            // Just disconnect without triggering logout
-            this.disconnect();
-          }
-        }).catch(err => {
-          console.error("Error handling auth expiry:", err);
-          // Fallback: just disconnect without triggering logout
-          this.disconnect();
-        });
+          });
       });
     });
   }

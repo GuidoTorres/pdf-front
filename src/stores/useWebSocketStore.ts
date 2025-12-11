@@ -7,6 +7,15 @@ import {
   WorkerMetrics,
 } from "../services/websocket";
 
+let documentStoreModule: { useDocumentStore: typeof import("./useDocumentStore")["useDocumentStore"] } | null = null;
+
+const getDocumentStore = async () => {
+  if (!documentStoreModule) {
+    documentStoreModule = await import("./useDocumentStore");
+  }
+  return documentStoreModule.useDocumentStore;
+};
+
 interface WebSocketState {
   // Connection state
   isConnected: boolean;
@@ -33,6 +42,8 @@ interface WebSocketState {
     jobId?: string;
   }>;
 
+  unsubscribers: Array<() => void>;
+
   // Actions
   connect: (token?: string) => Promise<void>;
   disconnect: () => void;
@@ -40,10 +51,10 @@ interface WebSocketState {
   clearNotifications: () => void;
   subscribeToAdminEvents: () => void;
   unsubscribeFromAdminEvents: () => void;
+  setSystemMetrics: (metrics: SystemMetrics | null) => void;
 }
 
-export const useWebSocketStore = create<WebSocketState>((set, get) => ({
-  // Initial state
+const baseState = {
   isConnected: false,
   isConnecting: false,
   connectionError: null,
@@ -51,9 +62,17 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
   queueStatus: null,
   systemMetrics: null,
   notifications: [],
+};
+
+export const useWebSocketStore = create<WebSocketState>((set, get) => ({
+  ...baseState,
+  unsubscribers: [] as Array<() => void>,
 
   connect: async (token?: string) => {
-    set({ isConnecting: true, connectionError: null });
+    set({
+      isConnecting: true,
+      connectionError: null,
+    });
 
     try {
       await websocketService.connect(token);
@@ -61,15 +80,6 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
       // Set up event listeners
       const unsubscribeJobProgress = websocketService.onJobProgress(
         (progress) => {
-          console.log("[WebSocket Store] Job progress update received:", {
-            jobId: progress.jobId,
-            status: progress.status,
-            progress: progress.progress,
-            hasResult: !!progress.result,
-            hasError: !!progress.error,
-            timestamp: new Date().toISOString()
-          });
-          
           set((state) => ({
             jobProgress: {
               ...state.jobProgress,
@@ -77,27 +87,21 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
             },
           }));
 
-          // Update document store with job progress
-          console.log("[WebSocket Store] About to update document store for job:", progress.jobId);
-          import("./useDocumentStore").then(({ useDocumentStore }) => {
-            const documentStore = useDocumentStore.getState();
-            console.log("[WebSocket Store] Calling handleWebSocketJobUpdate:", {
-              jobId: progress.jobId,
-              status: progress.status,
-              currentDocuments: documentStore.documents.length
+          getDocumentStore()
+            .then((useDocumentStore) => {
+              const documentStore = useDocumentStore.getState();
+              documentStore.handleWebSocketJobUpdate(
+                progress.jobId,
+                progress.status,
+                progress.progress,
+                progress.step,
+                progress.result,
+                progress.error
+              );
+            })
+            .catch((error) => {
+              console.error("Error updating document store:", error);
             });
-            documentStore.handleWebSocketJobUpdate(
-              progress.jobId,
-              progress.status,
-              progress.progress,
-              progress.step,
-              progress.result,
-              progress.error
-            );
-            console.log("[WebSocket Store] handleWebSocketJobUpdate completed for job:", progress.jobId);
-          }).catch(error => {
-            console.error("Error updating document store:", error);
-          });
 
           // Create notifications for completed/failed jobs
           if (progress.status === "completed" || progress.status === "failed") {
@@ -194,15 +198,13 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
           set({ systemMetrics: metrics });
 
           // Create system alerts for critical issues - with validation
-          if (metrics && metrics.performance && metrics.performance.errorRate > 0.1) {
-            // 10% error rate
+          const successRate = metrics?.performance?.successRate;
+          if (typeof successRate === "number" && successRate < 85) {
             const notification = {
               id: `system-alert-${Date.now()}`,
               type: "system-alert" as const,
-              title: "High Error Rate",
-              message: `System error rate is ${(
-                metrics.performance.errorRate * 100
-              ).toFixed(1)}%`,
+              title: "Tasa de éxito baja",
+              message: `La tasa de éxito cayó a ${successRate.toFixed(1)}% en la última hora`,
               timestamp: new Date(),
               read: false,
             };
@@ -225,12 +227,16 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
       );
 
       // Store unsubscribe functions for cleanup
-      (window as any).__wsUnsubscribers = [
-        unsubscribeJobProgress,
-        unsubscribeQueueStatus,
-        unsubscribeSystemMetrics,
-        unsubscribeConnectionStatus,
-      ];
+      set((state) => ({
+        unsubscribers: [
+          unsubscribeJobProgress,
+          unsubscribeQueueStatus,
+          unsubscribeSystemMetrics,
+          unsubscribeConnectionStatus,
+          ...state.unsubscribers,
+        ],
+        isConnected: true,
+      }));
 
       set({ isConnecting: false });
     } catch (error) {
@@ -246,21 +252,12 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
   disconnect: () => {
     websocketService.disconnect();
 
-    // Clean up event listeners
-    if ((window as any).__wsUnsubscribers) {
-      (window as any).__wsUnsubscribers.forEach((unsubscribe: () => void) =>
-        unsubscribe()
-      );
-      delete (window as any).__wsUnsubscribers;
-    }
+    const { unsubscribers = [] } = get();
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
 
     set({
-      isConnected: false,
-      isConnecting: false,
-      connectionError: null,
-      jobProgress: {},
-      queueStatus: null,
-      systemMetrics: null,
+      ...baseState,
+      unsubscribers: [],
     });
   },
 
@@ -284,5 +281,8 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => ({
   unsubscribeFromAdminEvents: () => {
     websocketService.unsubscribeFromAdminEvents();
     set({ systemMetrics: null });
+  },
+  setSystemMetrics: (metrics) => {
+    set({ systemMetrics: metrics });
   },
 }));

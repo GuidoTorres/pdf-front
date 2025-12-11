@@ -1,4 +1,9 @@
 import axios from "axios";
+import {
+  getAuthToken,
+  setAuthToken,
+  clearAuthToken,
+} from "./api";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:3000/api";
@@ -17,7 +22,7 @@ const api = axios.create({
 
 // Request interceptor to add auth token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("auth_token");
+  const token = getAuthToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -43,7 +48,7 @@ export const signInWithPassword = async (email: string, password: string) => {
     });
 
     // Store token and user data
-    localStorage.setItem("auth_token", response.data.token);
+    setAuthToken(response.data.token);
     localStorage.setItem("user", JSON.stringify(response.data.user));
 
     return response.data;
@@ -65,7 +70,7 @@ export const signUpWithPassword = async (
     });
 
     // Store token and user data
-    localStorage.setItem("auth_token", response.data.token);
+    setAuthToken(response.data.token);
     localStorage.setItem("user", JSON.stringify(response.data.user));
 
     return response.data;
@@ -76,22 +81,21 @@ export const signUpWithPassword = async (
 
 export const signOut = async () => {
   try {
-    const token = localStorage.getItem("auth_token");
+    const token = getAuthToken();
     if (token) {
       await api.post("/auth/logout");
     }
   } catch (error) {
     console.error("Logout error:", error);
   } finally {
-    // Always clear local storage
-    localStorage.removeItem("auth_token");
+    clearAuthToken();
     localStorage.removeItem("user");
     window.location.href = "/";
   }
 };
 
 export const getCurrentUser = async () => {
-  const token = localStorage.getItem("auth_token");
+  const token = getAuthToken();
   const user = localStorage.getItem("user");
 
   if (!token || !user) return null;
@@ -103,7 +107,7 @@ export const getCurrentUser = async () => {
     return response.data.user;
   } catch (error) {
     // Token is invalid, clear storage
-    localStorage.removeItem("auth_token");
+    clearAuthToken();
     localStorage.removeItem("user");
     return null;
   }

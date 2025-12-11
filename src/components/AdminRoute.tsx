@@ -24,7 +24,7 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   }
 
   // Check if user is admin
-  const isAdmin = user?.plan === "admin" || user?.email?.includes("admin");
+  const isAdmin = user?.isAdmin === true;
 
   if (!isAdmin) {
     return (

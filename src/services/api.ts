@@ -1,6 +1,28 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
+// Centralized token management
+const AUTH_TOKEN_KEY = "auth_token";
+
+export const getAuthToken = (): string | null => {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  if (!token) return null;
+  const trimmed = token.trim();
+  return trimmed && trimmed !== "null" && trimmed !== "undefined" ? trimmed : null;
+};
+
+export const setAuthToken = (token: string | null) => {
+  if (!token) {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+  } else {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+  }
+};
+
+export const clearAuthToken = () => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+};
+
 // Global handler for authentication errors
 let authExpiredHandler: (() => void) | null = null;
 
@@ -9,16 +31,15 @@ export const setAuthExpiredHandler = (handler: () => void) => {
 };
 
 const handleAuthError = (hadValidTokenBefore = true) => {
-  // Only trigger session expired if user had a valid session before
   if (hadValidTokenBefore && authExpiredHandler) {
     authExpiredHandler();
-  } else if (hadValidTokenBefore) {
-    // Fallback: remove token and redirect only if user was authenticated
-    localStorage.removeItem("auth_token");
+    return;
+  }
+
+  clearAuthToken();
+
+  if (hadValidTokenBefore) {
     window.location.href = "/login";
-  } else {
-    // Silent handling for users who weren't authenticated
-    localStorage.removeItem("auth_token");
   }
 };
 
@@ -80,6 +101,7 @@ export interface User {
   id: string;
   email: string;
   name?: string;
+  isAdmin?: boolean;
   subscription?: {
     plan: string;
     pages_remaining: number;
@@ -95,11 +117,11 @@ export interface User {
 
 class ApiService {
   private isAuthenticated(): boolean {
-    return !!localStorage.getItem("auth_token");
+    return !!getAuthToken();
   }
 
-  private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem("auth_token");
+  getAuthHeaders(): HeadersInit {
+    const token = getAuthToken();
     return {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -107,10 +129,14 @@ class ApiService {
   }
 
   private getFormDataHeaders(): HeadersInit {
-    const token = localStorage.getItem("auth_token");
+    const token = getAuthToken();
     return {
       ...(token && { Authorization: `Bearer ${token}` }),
     };
+  }
+
+  get baseUrl() {
+    return API_BASE_URL;
   }
 
   async login(
@@ -127,7 +153,7 @@ class ApiService {
       const data = await response.json();
 
       if (response.ok && data.token) {
-        localStorage.setItem("auth_token", data.token);
+        setAuthToken(data.token);
         return { success: true, data };
       }
 
@@ -152,7 +178,7 @@ class ApiService {
       const data = await response.json();
 
       if (response.ok && data.token) {
-        localStorage.setItem("auth_token", data.token);
+        setAuthToken(data.token);
         return { success: true, data };
       }
 
@@ -163,7 +189,7 @@ class ApiService {
   }
 
   async logout(): Promise<void> {
-    localStorage.removeItem("auth_token");
+    clearAuthToken();
   }
 
   async getCurrentUser(): Promise<ApiResponse<User>> {
@@ -180,7 +206,7 @@ class ApiService {
 
       // Handle authentication errors
       if (response.status === 401) {
-        const hadValidToken = !!localStorage.getItem("auth_token");
+        const hadValidToken = !!getAuthToken();
         handleAuthError(hadValidToken);
         return {
           success: false,
@@ -213,7 +239,7 @@ class ApiService {
 
       // Handle authentication errors
       if (response.status === 401) {
-        const hadValidToken = !!localStorage.getItem("auth_token");
+        const hadValidToken = !!getAuthToken();
         handleAuthError(hadValidToken);
         return {
           success: false,
@@ -244,7 +270,7 @@ class ApiService {
 
       // Handle authentication errors
       if (response.status === 401) {
-        const hadValidToken = !!localStorage.getItem("auth_token");
+        const hadValidToken = !!getAuthToken();
         handleAuthError(hadValidToken);
         return {
           success: false,
@@ -282,7 +308,7 @@ class ApiService {
 
       // Handle authentication errors
       if (response.status === 401) {
-        const hadValidToken = !!localStorage.getItem("auth_token");
+        const hadValidToken = !!getAuthToken();
         handleAuthError(hadValidToken);
         return {
           success: false,
@@ -333,7 +359,7 @@ class ApiService {
 
       // Handle authentication errors
       if (response.status === 401) {
-        const hadValidToken = !!localStorage.getItem("auth_token");
+        const hadValidToken = !!getAuthToken();
         handleAuthError(hadValidToken);
         return {
           success: false,

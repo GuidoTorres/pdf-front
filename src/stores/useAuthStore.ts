@@ -5,7 +5,13 @@ import {
   signUpWithPassword,
   signOut,
 } from "../services/auth";
-import { apiService, setAuthExpiredHandler } from "../services/api";
+import {
+  apiService,
+  setAuthExpiredHandler,
+  getAuthToken,
+  setAuthToken,
+  clearAuthToken,
+} from "../services/api";
 import { NavigateFunction } from "react-router-dom";
 import { useNotificationStore } from "./useNotificationStore";
 
@@ -13,6 +19,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  isAdmin?: boolean;
   plan?: string;
   pages_remaining?: number;
   subscription?: {
@@ -30,7 +37,7 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  isRehydrated: boolean; // Add this
+  isRehydrated: boolean;
   navigate: NavigateFunction | null;
   login: (email: string, password: string) => Promise<boolean>;
   register: (
@@ -61,9 +68,6 @@ export const useAuthStore = create<AuthState>()(
       setNavigate: (navigate) => set({ navigate }),
 
       initialize: (navigate) => {
-        const currentState = get();
-        
-
         if (navigate) {
           get().setNavigate(navigate);
         }
@@ -75,49 +79,26 @@ export const useAuthStore = create<AuthState>()(
 
         const checkInitialSession = async () => {
           try {
-            // Wait for rehydration to complete
-            const waitForRehydration = () => {
-              return new Promise<void>((resolve) => {
-                const checkRehydration = () => {
-                  const currentState = get();
-                  if (currentState.isRehydrated) {
-                    resolve();
-                  } else {
-                    setTimeout(checkRehydration, 50);
-                  }
-                };
-                checkRehydration();
+            await new Promise<void>((resolve) => {
+              const unsubscribe = useAuthStore.subscribe((state) => {
+                if (state.isRehydrated) {
+                  unsubscribe();
+                  resolve();
+                }
               });
-            };
+            });
 
-            await waitForRehydration();
-            
-            // Check both localStorage and persisted state
-            const token = localStorage.getItem("auth_token");
+            const token = getAuthToken();
             const currentState = get();
-            
-            
-            // If we have persisted authentication but no token, something is wrong
-            // However, give a brief moment for Google login to complete token storage
+
             if (currentState.isAuthenticated && currentState.user && !token) {
-              console.warn("[AUTH] Persisted auth but no token - waiting briefly for token...");
-              
-              // Wait briefly for token to be saved (Google login may be in progress)
-              await new Promise(resolve => setTimeout(resolve, 100));
-              const retryToken = localStorage.getItem("auth_token");
-              
-              if (!retryToken || retryToken.trim() === "" || retryToken === "null" || retryToken === "undefined") {
-                console.warn("[AUTH] Still no token after retry - clearing persisted state");
-                set({ isLoading: false, isAuthenticated: false, user: null });
-                return;
-              } else {
-                await get().checkAuth();
-                return;
-              }
+              console.warn("[AUTH] Persisted auth without token; clearing state");
+              clearAuthToken();
+              set({ isLoading: false, isAuthenticated: false, user: null });
+              return;
             }
-            
-            // Only check auth if we have a token that looks valid
-            if (token && token.trim() && token !== "null" && token !== "undefined") {
+
+            if (token) {
               await get().checkAuth();
             } else {
               set({ isLoading: false, isAuthenticated: false, user: null });
@@ -140,6 +121,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           const data = await signInWithPassword(email, password);
           if (data.success && data.user) {
+            if (data.token) {
+              setAuthToken(data.token);
+            }
             set({
               user: data.user,
               isAuthenticated: true,
@@ -161,6 +145,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           const data = await signUpWithPassword(email, password, name);
           if (data.success && data.user) {
+            if (data.token) {
+              setAuthToken(data.token);
+            }
             set({
               user: data.user,
               isAuthenticated: true,
@@ -196,6 +183,7 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           console.error("Logout error:", error);
         } finally {
+          clearAuthToken();
           set({
             user: null,
             isAuthenticated: false,
@@ -209,8 +197,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkAuth: async () => {
-        const token = localStorage.getItem("auth_token");
-        if (!token || token.trim() === "" || token === "null" || token === "undefined") {
+        const token = getAuthToken();
+        if (!token) {
           set({ isAuthenticated: false, user: null, isLoading: false });
           return;
         }
@@ -226,8 +214,7 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
             });
           } else {
-            localStorage.removeItem("auth_token");
-            localStorage.removeItem("user");
+            clearAuthToken();
             set({
               user: null,
               isAuthenticated: false,
@@ -235,8 +222,7 @@ export const useAuthStore = create<AuthState>()(
             });
           }
         } catch (error) {
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("user");
+          clearAuthToken();
           set({
             user: null,
             isAuthenticated: false,
@@ -254,9 +240,7 @@ export const useAuthStore = create<AuthState>()(
             "Your session has expired. Please log in again."
           );
 
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("user");
-        
+        clearAuthToken();
         set({
           user: null,
           isAuthenticated: false,
@@ -275,8 +259,7 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
           isLoading: false,
         });
-        localStorage.setItem("auth_token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
+        setAuthToken(data.token);
       },
 
       // Add method to update user pages in real-time

@@ -28,6 +28,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 import LandingLayout from "./components/LandingLayout";
 import ConditionalLayout from "./components/ConditionalLayout";
 import NotificationProvider from "./components/NotificationProvider";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { useAuthStore } from "./stores/useAuthStore";
 import { useWebSocketStore } from "./stores/useWebSocketStore";
 
@@ -46,21 +47,34 @@ const AppInitializer: React.FC = () => {
   // Initialize WebSocket when user is authenticated
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      // Wait a bit to ensure token is properly saved after Google login
       const connectTimeout = setTimeout(() => {
-        const token = localStorage.getItem("auth_token");
-        if (token && token.trim() && token !== "null" && token !== "undefined") {
-          connectWebSocket(token);
-        } else {
-          disconnectWebSocket();
-        }
+        import("./services/api").then(({ getAuthToken }) => {
+          const token = getAuthToken();
+          if (token) {
+            connectWebSocket(token);
+          } else {
+            disconnectWebSocket();
+          }
+        });
       }, 200);
 
       return () => clearTimeout(connectTimeout);
-    } else {
-      disconnectWebSocket();
     }
+
+    disconnectWebSocket();
   }, [isAuthenticated, isLoading, connectWebSocket, disconnectWebSocket]);
+
+  useEffect(() => {
+    if (typeof Notification === "undefined") {
+      return;
+    }
+
+    if (isAuthenticated && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {
+        /* ignore */
+      });
+    }
+  }, [isAuthenticated]);
 
   if (isLoading) {
     return (
@@ -82,7 +96,8 @@ function App() {
         <Router>
           <ScrollToTop />
           <AppInitializer />
-          <Routes>
+          <ErrorBoundary>
+            <Routes>
             {/* Public Routes with LandingLayout */}
             <Route
               element={
@@ -131,7 +146,8 @@ function App() {
 
             {/* 404 Page for unmatched routes */}
             <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+            </Routes>
+          </ErrorBoundary>
 
           {/* Global Notification System */}
           <NotificationProvider />

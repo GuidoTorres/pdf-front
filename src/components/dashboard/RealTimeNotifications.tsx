@@ -19,8 +19,10 @@ const RealTimeNotifications: React.FC = () => {
 
   // Request notification permission on component mount
   useEffect(() => {
-    if (Notification.permission === "default") {
-      Notification.requestPermission();
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {
+        /* ignore */
+      });
     }
   }, []);
 

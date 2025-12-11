@@ -27,7 +27,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuthStore();
 
   // Check if user is admin
-  const isAdmin = user?.plan === "admin" || user?.email?.includes("admin");
+  const isAdmin = user?.isAdmin === true;
 
   const sidebarItems = [
     {

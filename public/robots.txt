@@ -2,7 +2,7 @@ User-agent: *
 Allow: /
 
 # Sitemap - StatementAI
-Sitemap: https://tu-dominio.com/sitemap.xml
+Sitemap: https://fluentlabs.cloud/sitemap.xml
 
 # Principales páginas para crawlear - StatementAI
 Allow: /

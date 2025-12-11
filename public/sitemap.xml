@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <!-- Página principal -->
   <url>
-    <loc>https://tu-dominio.com/</loc>
+    <loc>https://fluentlabs.cloud/</loc>
     <lastmod>2024-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
@@ -10,7 +10,7 @@
   
   <!-- Página de precios -->
   <url>
-    <loc>https://tu-dominio.com/pricing</loc>
+    <loc>https://fluentlabs.cloud/pricing</loc>
     <lastmod>2024-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
@@ -18,7 +18,7 @@
   
   <!-- Página de ayuda -->
   <url>
-    <loc>https://tu-dominio.com/help</loc>
+    <loc>https://fluentlabs.cloud/help</loc>
     <lastmod>2024-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
@@ -26,7 +26,7 @@
   
   <!-- Términos de servicio -->
   <url>
-    <loc>https://tu-dominio.com/terms</loc>
+    <loc>https://fluentlabs.cloud/terms</loc>
     <lastmod>2024-12-22</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
@@ -34,7 +34,7 @@
   
   <!-- Política de privacidad -->
   <url>
-    <loc>https://tu-dominio.com/privacy</loc>
+    <loc>https://fluentlabs.cloud/privacy</loc>
     <lastmod>2024-12-22</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
@@ -42,7 +42,7 @@
   
   <!-- Política de reembolso -->
   <url>
-    <loc>https://tu-dominio.com/refund</loc>
+    <loc>https://fluentlabs.cloud/refund</loc>
     <lastmod>2024-12-22</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>

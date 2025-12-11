@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import { apiService, ProcessingResult, Transaction } from "../services/api";
+import {
+  apiService,
+  ProcessingResult,
+  Transaction,
+  getAuthToken,
+} from "../services/api";
 import { CategorizationService } from "../services/categorization";
 import {
   BankDetectionService,
@@ -40,7 +45,7 @@ interface DocumentState {
   batchProgress: { current: number; total: number; files: string[] } | null;
   editingTransactions: Record<string, boolean>; // Track which transactions are being edited
   hasUnsavedChanges: boolean;
-  activePollingIntervals: Map<string, NodeJS.Timeout>;
+  activePollingIntervals: Map<string, ReturnType<typeof setTimeout>>;
   setCurrentDocument: (document: DocumentWithStatus | null) => void;
   processDocument: (file: File) => Promise<void>;
   processBatchDocuments: (files: File[]) => Promise<void>;
@@ -113,17 +118,32 @@ function detectBankFromDocument(
   return result || undefined;
 }
 
-export const useDocumentStore = create<DocumentState>((set, get) => ({
-  documents: [],
-  isProcessing: false,
-  activeJobId: null,
-  currentDocument: null,
-  batchProgress: null,
-  editingTransactions: {},
-  hasUnsavedChanges: false,
-  activePollingIntervals: new Map(),
+export const useDocumentStore = create<DocumentState>((set, get) => {
+  const clearPollingTimer = (jobId: string) => {
+    const timers = get().activePollingIntervals;
+    const existing = timers.get(jobId);
+    if (existing) {
+      clearTimeout(existing);
+      clearInterval(existing);
+    }
+    if (timers.has(jobId)) {
+      const newTimers = new Map(timers);
+      newTimers.delete(jobId);
+      set({ activePollingIntervals: newTimers });
+    }
+  };
 
-  setCurrentDocument: (document) => {
+  return {
+    documents: [],
+    isProcessing: false,
+    activeJobId: null,
+    currentDocument: null,
+    batchProgress: null,
+    editingTransactions: {},
+    hasUnsavedChanges: false,
+    activePollingIntervals: new Map(),
+
+    setCurrentDocument: (document) => {
     // Store original state when setting current document
     originalDocumentState = document
       ? JSON.parse(JSON.stringify(document))
@@ -135,7 +155,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     });
   },
 
-  processDocument: async (file: File) => {
+    processDocument: async (file: File) => {
     set({ isProcessing: true, activeJobId: null });
 
     const placeholder: DocumentWithStatus = {
@@ -164,21 +184,22 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         // Use WebSocket for real-time updates with polling safety net
         const wsStore = useWebSocketStore.getState();
         if (wsStore.isConnected) {
-          // WebSocket will handle real-time updates
-          
-          // But also start a safety polling after a delay as backup
-          setTimeout(() => {
+          const safetyTimer = setTimeout(() => {
             const currentState = get();
-            const doc = currentState.documents.find(d => d.jobId === jobId);
-            
-            // If document still exists and isn't completed, start safety polling
+            const doc = currentState.documents.find((d) => d.jobId === jobId);
             if (doc && doc.status !== "completed" && doc.status !== "failed") {
               get().pollJobStatus(jobId);
             }
-          }, 30000); // 30 seconds safety timeout
+          }, 30000);
+
+          clearPollingTimer(jobId);
+          set((state) => {
+            const timers = new Map(state.activePollingIntervals);
+            timers.set(jobId, safetyTimer);
+            return { activePollingIntervals: timers };
+          });
         } else {
-          // Fallback to polling if WebSocket not connected
-          get().pollJobStatus(jobId);
+            get().pollJobStatus(jobId);
         }
       } else {
         throw new Error(response.error || "Failed to start processing");
@@ -206,8 +227,6 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         }).catch(err => {
           console.error("Failed to load notification store:", err);
         });
-      } else {
-        console.log("Not a page limit error, showing generic error");
       }
 
       set((state) => ({
@@ -221,14 +240,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         isProcessing: false,
       }));
     }
-  },
+    },
 
-  pollJobStatus: (jobId: string) => {
-    // Clear any existing interval for this jobId
-    const existingInterval = get().activePollingIntervals.get(jobId);
-    if (existingInterval) {
-      clearInterval(existingInterval);
-    }
+    pollJobStatus: (jobId: string) => {
+    clearPollingTimer(jobId);
 
     const interval = setInterval(async () => {
       try {
@@ -236,7 +251,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         const currentDoc = get().documents.find(d => d.jobId === jobId);
         if (!currentDoc || currentDoc.status === "completed" || currentDoc.status === "failed") {
           clearInterval(interval);
-          get().activePollingIntervals.delete(jobId);
+          clearPollingTimer(jobId);
           return;
         }
 
@@ -255,6 +270,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
           if (state === "completed") {
             clearInterval(interval);
+            clearPollingTimer(jobId);
             const newDocument = result as ProcessingResult;
 
             // Apply automatic categorization to transactions
@@ -340,6 +356,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
             }));
           } else if (state === "failed") {
             clearInterval(interval);
+            clearPollingTimer(jobId);
             set((state) => ({
               documents: state.documents.map((doc) =>
                 doc.jobId === jobId ? { ...doc, status: "failed" } : doc
@@ -352,6 +369,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       } catch (error) {
         console.error("Error polling job status:", error);
         clearInterval(interval);
+        clearPollingTimer(jobId);
         set((state) => ({
           documents: state.documents.map((doc) =>
             doc.jobId === jobId ? { ...doc, status: "failed" } : doc
@@ -361,15 +379,18 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         }));
       }
     }, 3000);
-    
-    // Store the interval reference
-    get().activePollingIntervals.set(jobId, interval);
-  },
 
-  loadHistory: async () => {
+    set((state) => {
+      const timers = new Map(state.activePollingIntervals);
+      timers.set(jobId, interval);
+      return { activePollingIntervals: timers };
+    });
+    },
+
+    loadHistory: async () => {
     // Check if user is authenticated before making API call
-    const token = localStorage.getItem("auth_token");
-    if (!token || token.trim() === "" || token === "null" || token === "undefined") {
+    const token = getAuthToken();
+    if (!token) {
       return;
     }
 
@@ -406,7 +427,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     } catch (error) {
       set({ documents: [] });
     }
-  },
+    },
 
   processBatchDocuments: async (files: File[]) => {
     if (files.length === 0) return;
@@ -522,7 +543,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     });
   },
 
-  updateTransaction: (transactionId: string, updates: Partial<Transaction>) => {
+    updateTransaction: (transactionId: string, updates: Partial<Transaction>) => {
     const state = get();
     if (!state.currentDocument) return;
 
@@ -565,18 +586,18 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       currentDocument: updatedDocument,
       hasUnsavedChanges: true,
     });
-  },
+    },
 
-  setTransactionEditing: (transactionId: string, isEditing: boolean) => {
+    setTransactionEditing: (transactionId: string, isEditing: boolean) => {
     set((state) => ({
       editingTransactions: {
         ...state.editingTransactions,
         [transactionId]: isEditing,
       },
     }));
-  },
+    },
 
-  saveChanges: () => {
+    saveChanges: () => {
     const state = get();
     if (!state.currentDocument || !state.hasUnsavedChanges) return;
 
@@ -595,9 +616,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     });
 
     // TODO: In a real app, you'd also persist changes to backend
-  },
+    },
 
-  discardChanges: () => {
+    discardChanges: () => {
     if (originalDocumentState) {
       set({
         currentDocument: JSON.parse(JSON.stringify(originalDocumentState)),
@@ -605,7 +626,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         editingTransactions: {},
       });
     }
-  },
+    },
 
   handleWebSocketJobUpdate: (
     jobId: string,
@@ -615,203 +636,164 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     result?: any,
     error?: string
   ) => {
-    // Check if document exists
-    const currentDocs = get().documents;
-    const existingDoc = currentDocs.find(doc => doc.jobId === jobId);
-    
-    if (!existingDoc) {
-      // Only ignore if it's a progress update - allow completed/failed through
-      if (status !== "completed" && status !== "failed") {
-        return;
-      } else {
-        // For completed/failed jobs, try to find recently uploaded documents that might match
-        const recentDoc = get().documents.find(doc => 
-          doc.jobId.startsWith('temp-') && 
-          Date.now() - parseInt(doc.jobId.split('-')[1]) < 60000 // Within last minute
-        );
-        
-        if (!recentDoc) {
-          return;
-        } else {
-          // Update the document with the real jobId
-          set((state) => ({
-            documents: state.documents.map((doc) =>
-              doc.jobId === recentDoc.jobId 
-                ? { ...doc, jobId: jobId }
-                : doc
-            ),
-          }));
-        }
+    let documents = get().documents;
+    let targetDoc = documents.find((doc) => doc.jobId === jobId);
+
+    if (!targetDoc && (status === "completed" || status === "failed")) {
+      const recentDoc = documents.find(
+        (doc) =>
+          doc.jobId.startsWith("temp-") &&
+          Date.now() - Number(doc.jobId.split("-")[1]) < 60000
+      );
+
+      if (recentDoc) {
+        set((state) => ({
+          documents: state.documents.map((doc) =>
+            doc.jobId === recentDoc.jobId ? { ...doc, jobId } : doc
+          ),
+        }));
+        documents = get().documents;
+        targetDoc = documents.find((doc) => doc.jobId === jobId);
       }
     }
 
-    // Update document status and progress
-    set((state) => ({
-      documents: state.documents.map((doc) => {
-        if (doc.jobId === jobId) {
-          // Don't update cancelled documents
-          if (doc.status === "cancelled") {
-            console.log('🚫 Ignoring WebSocket update for cancelled job:', jobId);
-            return doc;
-          }
+    if (!targetDoc) {
+      return;
+    }
 
-          const updatedDoc = { ...doc };
-
-          if (step) updatedDoc.step = step;
-          if (progress !== undefined) updatedDoc.progress = progress;
-
-          if (status === "completed" && result) {
-            // Apply automatic categorization to transactions
-            const categorizedTransactions =
-              result.transactions?.map((transaction: Transaction) => {
-                const categorization =
-                  CategorizationService.categorizeTransaction(
-                    transaction.description,
-                    transaction.amount,
-                    transaction.type
-                  );
-
-                return {
-                  ...transaction,
-                  category: categorization.category,
-                  subcategory: categorization.subcategory,
-                  confidence: categorization.confidence,
-                  date:
-                    transaction.date ||
-                    transaction.post_date ||
-                    transaction.value_date,
-                };
-              }) || [];
-
-            // Detect bank from document content
-            const currentDoc = state.documents.find((d) => d.jobId === jobId);
-            const bankDetection = detectBankFromDocument(
-              result,
-              currentDoc?.fileName
-            );
-
-            const categorizedDocument = {
-              ...result,
-              transactions: categorizedTransactions,
-              bankDetection,
-            };
-
-            const finalDocument = {
-              ...updatedDoc,
-              ...categorizedDocument,
-              status: "completed" as DocumentStatus,
-            };
-            
-            return finalDocument;
-          } else if (status === "failed") {
-            return {
-              ...updatedDoc,
-              status: "failed" as DocumentStatus,
-              step: error || "Processing failed",
-            };
-          } else {
-            return {
-              ...updatedDoc,
-              status: status as DocumentStatus,
-            };
-          }
-        }
-        return doc;
-      }),
-    }));
-
-    // Update processing state and clean up polling
     if (status === "completed" || status === "failed") {
-      // Clear any active polling for this job
-      const existingInterval = get().activePollingIntervals.get(jobId);
-      if (existingInterval) {
-        clearInterval(existingInterval);
-        get().activePollingIntervals.delete(jobId);
-      }
-
+      clearPollingTimer(jobId);
       set((state) => ({
         isProcessing: state.activeJobId === jobId ? false : state.isProcessing,
         activeJobId: state.activeJobId === jobId ? null : state.activeJobId,
       }));
     }
+
+    set((state) => ({
+      documents: state.documents.map((doc) => {
+        if (doc.jobId !== jobId) {
+          return doc;
+        }
+
+        if (doc.status === "cancelled") {
+          return doc;
+        }
+
+        const nextDoc: DocumentWithStatus = {
+          ...doc,
+          step: step ?? doc.step,
+          progress: progress ?? doc.progress,
+        };
+
+        if (status === "completed" && result) {
+          const categorizedTransactions =
+            result.transactions?.map((transaction: Transaction) => {
+              const categorization = CategorizationService.categorizeTransaction(
+                transaction.description,
+                transaction.amount,
+                transaction.type
+              );
+
+              return {
+                ...transaction,
+                category: categorization.category,
+                subcategory: categorization.subcategory,
+                confidence: categorization.confidence,
+                date:
+                  transaction.date ||
+                  transaction.post_date ||
+                  transaction.value_date,
+              };
+            }) || [];
+
+          const bankDetection = detectBankFromDocument(
+            result,
+            doc.fileName
+          );
+
+          return {
+            ...nextDoc,
+            ...result,
+            transactions: categorizedTransactions,
+            bankDetection,
+            status: "completed",
+          };
+        }
+
+        if (status === "failed") {
+          return {
+            ...nextDoc,
+            status: "failed",
+            step: error || "Processing failed",
+          };
+        }
+
+        return {
+          ...nextDoc,
+          status: status as DocumentStatus,
+        };
+      }),
+    }));
   },
 
-  cancelJob: (jobId: string) => {
-    const currentDoc = get().documents.find(doc => doc.jobId === jobId);
-    if (currentDoc) {
-      // Clear any existing polling intervals
-      const interval = get().activePollingIntervals.get(jobId);
-      if (interval) {
-        clearInterval(interval);
-        get().activePollingIntervals.delete(jobId);
+    cancelJob: (jobId: string) => {
+      const currentDoc = get().documents.find((doc) => doc.jobId === jobId);
+      if (!currentDoc) {
+        return;
       }
 
-      // Update document status to cancelled
+      clearPollingTimer(jobId);
+
       set((state) => ({
         documents: state.documents.map((doc) =>
-          doc.jobId === jobId 
-            ? { ...doc, status: "failed" as DocumentStatus, step: "Cancelled by user" }
+          doc.jobId === jobId
+            ? {
+                ...doc,
+                status: "cancelled" as DocumentStatus,
+                step: "Cancelled by user",
+              }
             : doc
         ),
-        isProcessing: state.documents.filter(doc => 
-          doc.jobId !== jobId && (doc.status === "processing")
-        ).length > 0,
+        isProcessing: state.documents.some(
+          (doc) => doc.jobId !== jobId && doc.status === "processing"
+        ),
       }));
 
-      // If this was the current document, clear it
       if (get().currentDocument?.jobId === jobId) {
         set({ currentDocument: null });
       }
-    }
-  },
+    },
 
-  removeDocument: async (jobId: string) => {
-    console.log('🗑️ removeDocument called with jobId:', jobId);
-    
-    try {
-      // Call backend API to cancel the job properly
-      const response = await apiService.cancelJob(jobId);
-      
-      if (!response.success) {
-        console.error('❌ Failed to cancel job on backend:', response.error);
-        // Continue with local cleanup even if backend fails
-      } else {
-        console.log('✅ Job cancelled on backend successfully');
+    removeDocument: async (jobId: string) => {
+      try {
+        const response = await apiService.cancelJob(jobId);
+        if (!response.success) {
+          console.error('Failed to cancel job on backend:', response.error);
+        }
+      } catch (error) {
+        console.error('Error calling cancel job API:', error);
       }
-    } catch (error) {
-      console.error('❌ Error calling cancel job API:', error);
-      // Continue with local cleanup even if API call fails
-    }
-    
-    // Clear any existing polling intervals
-    const interval = get().activePollingIntervals.get(jobId);
-    if (interval) {
-      console.log('⏹️ Clearing polling interval for job:', jobId);
-      clearInterval(interval);
-      get().activePollingIntervals.delete(jobId);
-    }
 
-    const beforeCount = get().documents.length;
-    
-    // Mark document as cancelled instead of removing it
-    set((state) => ({
-      documents: state.documents.map((doc) => 
-        doc.jobId === jobId 
-          ? { ...doc, status: "cancelled" as DocumentStatus, step: "Cancelado por el usuario" }
-          : doc
-      ),
-      isProcessing: state.documents.filter(doc => 
-        doc.jobId !== jobId && (doc.status === "processing")
-      ).length > 0,
-    }));
+      clearPollingTimer(jobId);
 
-    const afterCount = get().documents.length;
-    console.log(`📊 Documents count: ${beforeCount} -> ${afterCount} (marked as cancelled)`);
+      set((state) => ({
+        documents: state.documents.map((doc) =>
+          doc.jobId === jobId
+            ? {
+                ...doc,
+                status: "cancelled" as DocumentStatus,
+                step: "Cancelado por el usuario",
+              }
+            : doc
+        ),
+        isProcessing: state.documents.some(
+          (doc) => doc.jobId !== jobId && doc.status === "processing"
+        ),
+      }));
 
-    // If this was the current document, clear it
-    if (get().currentDocument?.jobId === jobId) {
-      console.log('🔄 Clearing current document');
-      set({ currentDocument: null });
-    }
-  },
-}));
+      if (get().currentDocument?.jobId === jobId) {
+        set({ currentDocument: null });
+      }
+    },
+  };
+});
